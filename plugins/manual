@@ -9,14 +9,7 @@ plugin_isbumpable() {
 }
 
 plugin_getpkgfiles() {
-	local TMPDIR=""
-	TMPDIR=$(mktemp -d)
-	cp -r "${PKGDIR}"/"${PKGNAME}"/files/* "${TMPDIR}"
-	chown -R pkgbuilder "${TMPDIR}"
-	sudo -u pkgbuilder updpkgsums "${TMPDIR}"/PKGBUILD
-	cp -r "${TMPDIR}"/PKGBUILD "${PKGDIR}/${PKGNAME}/files/"
-	rm -rf "${TMPDIR}"
-	echo "${PKGDIR}/${PKGNAME}/files"
+	updatePkgSums "${PKGDIR}"/"${PKGNAME}"/files
 }
 
 plugin_bump() {

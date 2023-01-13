@@ -64,6 +64,16 @@ getPluginFile() { # $1=PKGDIR $2=PKGNAME $3=PLUGINDIR
 		echo "${PLUGINDIR}"/"${PLUGIN}"
 	fi
 }
+updatePkgSums() { # $1=FILES
+	local -r FILES=${1}
+	local TMPDIR=""
+	TMPDIR=$(mktemp -d)
+	cp -r "${FILES}/*" "${TMPDIR}"
+	chown -R pkgbuilder "${TMPDIR}"
+	sudo -u pkgbuilder updpkgsums "${TMPDIR}"/PKGBUILD
+	cp -r "${TMPDIR}"/PKGBUILD "${FILES}/"
+	rm -rf "${TMPDIR}"
+}
 notify() {
 	if [ ${NOTIFY} == 0 ]; then
 		return 0
@@ -127,6 +137,10 @@ pkgBuild() { # $1=PKGNAME
 	if ! PLUGINFILE=$(getPluginFile "${PKGDIR}" "${PKGNAME}" "${PLUGINDIR}"); then
 		return 1
 	fi
+	# shellcheck disable=SC2034  # Variable for plugin
+	local -r PKGSETTINGS=${PKGDIR}/${PKGNAME}/settings
+	# shellcheck disable=SC2034  # Variable for plugin
+	local -r PKGBUILD="${PKGDIR}/${PKGNAME}/files/PKGBUILD"
 	. "${PLUGINFILE}"
 	local PKGFILES=""
 	if ! PKGFILES=$(plugin_getpkgfiles "${PKGDIR}" "${PKGNAME}"); then
@@ -243,6 +257,10 @@ pkgBump() { # $1=PKGNAME
 	if ! PLUGINFILE=$(getPluginFile "${PKGDIR}" "${PKGNAME}" "${PLUGINDIR}"); then
 		return 1
 	fi
+	# shellcheck disable=SC2034  # Variable for plugin
+	local -r PKGSETTINGS=${PKGDIR}/${PKGNAME}/settings
+	# shellcheck disable=SC2034  # Variable for plugin
+	local -r PKGBUILD="${PKGDIR}/${PKGNAME}/files/PKGBUILD"
 	. "${PLUGINFILE}"
 	if ! plugin_isbumpable; then
 		return 1
@@ -262,6 +280,10 @@ pkgCheckUpdate() { # $1=PKGNAME
 	if ! PLUGINFILE=$(getPluginFile "${PKGDIR}" "${PKGNAME}" "${PLUGINDIR}"); then
 		return 1
 	fi
+	# shellcheck disable=SC2034  # Variable for plugin
+	local -r PKGSETTINGS=${PKGDIR}/${PKGNAME}/settings
+	# shellcheck disable=SC2034  # Variable for plugin
+	local -r PKGBUILD="${PKGDIR}/${PKGNAME}/files/PKGBUILD"
 	. "${PLUGINFILE}"
 	local -r PKGVERSION=$(readSetting "${PKGDIR}"/"${PKGNAME}"/settings "version" "0")
 	local -r PKGPLUGIN=$(readSetting "${PKGDIR}"/"${PKGNAME}"/settings "plugin" "")
@@ -310,6 +332,10 @@ pkgUpdate() { # $1=PKGNAME
 	if ! PLUGINFILE=$(getPluginFile "${PKGDIR}" "${PKGNAME}" "${PLUGINDIR}"); then
 		return 1
 	fi
+	# shellcheck disable=SC2034  # Variable for plugin
+	local -r PKGSETTINGS=${PKGDIR}/${PKGNAME}/settings
+	# shellcheck disable=SC2034  # Variable for plugin
+	local -r PKGBUILD="${PKGDIR}/${PKGNAME}/files/PKGBUILD"
 	. "${PLUGINFILE}"
 	if ! plugin_isupdatable; then
 		return 1

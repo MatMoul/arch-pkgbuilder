@@ -13,12 +13,11 @@ plugin_getpkgfiles() {
 }
 
 plugin_bump() { 
-	local -r PKGREL=$(readSetting "${PKGDIR}"/"${PKGNAME}"/files/PKGBUILD "pkgrel" 0)
-	sed -i "s/pkgrel=.*/pkgrel=$((PKGREL+1))/" "${PKGDIR}"/"${PKGNAME}"/files/PKGBUILD
+	local -r PKGREL=$(readSetting "${PKGBUILD}" "pkgrel" 0)
+	sed -i "s/pkgrel=.*/pkgrel=$((PKGREL+1))/" "${PKGBUILD}"
 }
 
 plugin_getlatestversion() {
-	local -r PKGSETTINGS=${PKGDIR}/${PKGNAME}/settings
 	local -r GITHUBUSER=$(readSetting "${PKGSETTINGS}" "githubuser" "")
 	local -r GITHUBREPO=$(readSetting "${PKGSETTINGS}" "githubrepo" "")
 	local GITHUBTAGNAME=""
@@ -44,7 +43,6 @@ plugin_getlatestversion() {
 }
 
 plugin_update() {
-	local -r PKGSETTINGS=${PKGDIR}/${PKGNAME}/settings
 	local -r GITHUBUSER=$(readSetting "${PKGSETTINGS}" "githubuser" "")
 	local -r GITHUBREPO=$(readSetting "${PKGSETTINGS}" "githubrepo" "")
 	local GITHUBTAGNAME=""
@@ -68,7 +66,6 @@ plugin_update() {
 	
 	writeSetting "${PKGSETTINGS}" "pkgrel" "1"
 
-	local -r PKGBUILD="${PKGDIR}/${PKGNAME}/files/PKGBUILD"
 	writeSetting "${PKGBUILD}" "_githubuser" "${GITHUBUSER}"
 	writeSetting "${PKGBUILD}" "_githubrepo" "${GITHUBREPO}"
 	writeSetting "${PKGBUILD}" "_pkgtagname" "${GITHUBTAGNAME}"
@@ -76,11 +73,5 @@ plugin_update() {
 	writeSetting "${PKGBUILD}" "pkgrel" "1"
 	writeSetting "${PKGBUILD}" "pkgver" "${GITHUBVERSION}"
 	
-	local TMPDIR=""
-	TMPDIR=$(mktemp -d)
-	cp -r "${PKGDIR}"/"${PKGNAME}"/files/* "${TMPDIR}"
-	chown -R pkgbuilder "${TMPDIR}"
-	sudo -u pkgbuilder updpkgsums "${TMPDIR}"/PKGBUILD
-	cp -r "${TMPDIR}"/PKGBUILD "${PKGDIR}/${PKGNAME}/files/"
-	rm -rf "${TMPDIR}"
+	updatePkgSums "${PKGDIR}"/"${PKGNAME}"/files
 }
