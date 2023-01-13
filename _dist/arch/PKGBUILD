@@ -1,0 +1,45 @@
+# Maintainer: MatMoul <matmoul@gmail.com>
+
+pkgname=pkgbuilder
+pkgver=0.0.0
+pkgrel=1
+pkgdesc="Arch packages builder solution"
+arch=('any')
+url="https://github.com/MatMoul/arch-pkg-builder"
+license=('GPL3')
+depends=('git' 'pacman-contrib' 'jq')
+optdepends=(
+	'msmtp-mta: For mail notification'
+	'postfix: For mail notification'
+	'apache: Web server for your repos'
+	'nginx: Web server for your repos'
+	'pacoloco: Pacman caching proxy server'
+)
+source=("${pkgname}::git+https://github.com/matmoul/arch-pkg-builder.git" 'pkgbuilder.sysusers')
+md5sums=('SKIP' 'SKIP')
+backup=('etc/pkgbuilder/config' 'etc/pkgbuilder/targets/local-test')
+
+package() {
+	install -D -m0644 pkgbuilder.sysusers ${pkgdir}/usr/lib/sysusers.d/pkgbuilder.conf
+	cd ${pkgname}
+	git checkout m3
+	install -d -m0755 ${pkgdir}/etc/pkgbuilder/packages
+	install -d -m0755 ${pkgdir}/etc/pkgbuilder/targets
+	install -d -m0755 ${pkgdir}/usr/share/pkgbuilder
+	install -d -m0755 ${pkgdir}/var/lib/pkgbuilder/packages/local-test
+	install -d -m0755 ${pkgdir}/var/lib/pkgbuilder/repos/local-test
+	install -d -m0755 ${pkgdir}/usr/share/pkgbuilder/plugins
+	install -d -m0755 ${pkgdir}/usr/share/pkgbuilder/models
+	install -d -m0755 ${pkgdir}/usr/share/bash-completion/completions
+	install -d -m0755 ${pkgdir}/usr/lib/systemd/system
+	install -D -m0644 LICENSE ${pkgdir}/usr/share/licenses/pkgbuilder/LICENSE
+	install -D -m0644 config ${pkgdir}/etc/pkgbuilder/config
+	install -D -m0644 plugins/* ${pkgdir}/usr/share/pkgbuilder/plugins
+	#install -D -d -m0644 models/* ${pkgdir}/usr/share/pkgbuilder/models
+	cp -r models/* ${pkgdir}/usr/share/pkgbuilder/models
+	install -D -m0644 targets/local-test ${pkgdir}/etc/pkgbuilder/targets/local-test
+	install -D -m0755 bin/pkgbuilder ${pkgdir}/usr/bin/pkgbuilder
+	install -D -m0755 bin/buildpkg ${pkgdir}/usr/bin/buildpkg
+	install -D -m0644 completion/bash/* ${pkgdir}/usr/share/bash-completion/completions
+	install -D -m0644 systemd/* ${pkgdir}/usr/lib/systemd/system
+}

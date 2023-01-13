@@ -1,0 +1,51 @@
+#!/bin/bash
+
+plugin_isupdatable() {
+	return 0
+}
+
+plugin_isbumpable() {
+	return 1
+}
+
+plugin_getpkgfiles() {
+	if [ -d "${PKGDIR}"/"${PKGNAME}"/files ]; then
+		if ! rm -r "${PKGDIR}"/"${PKGNAME}"/files; then
+			return 1
+		fi
+	fi
+	if ! git clone "https://aur@aur.archlinux.org/${PKGNAME}.git" "${PKGDIR}"/"${PKGNAME}"/files; then
+		return 1
+	fi
+	echo "${PKGDIR}/${PKGNAME}/files"
+}
+
+plugin_bump() {
+	return 1
+}
+
+plugin_getlatestversion() {
+	local PKGSRC=""
+	if ! PKGSRC=$(curl -sL https://aur.archlinux.org/cgit/aur.git/plain/.SRCINFO?h=${PKGNAME}); then
+		echo "Error in AUR API"
+		return 1
+	fi
+	ONLINEVER=""
+	if ! ONLINEVER=$(echo "${PKGSRC}" | grep "pkgver =" | sed "s/pkgver =//" | sed -e 's/^[[:space:]]*//')-$(echo "${PKGSRC}" | grep "pkgrel =" | sed "s/pkgrel =//" | sed -e 's/^[[:space:]]*//'); then
+		echo "Error in AUR API"
+		return 1
+	fi
+	if [ "${ONLINEVER}" == "" ]; then
+		echo "Error in AUR API"
+		return 1
+	fi
+	local -r ONLINEEPOCH=$(echo "${PKGSRC}" | grep epoch= | sed s/epoch=//)
+	if [[ ${ONLINEEPOCH} != "" ]]; then
+		ONLINEVER=${ONLINEEPOCH}:${ONLINEVER}
+	fi
+	echo "${ONLINEVER}"
+}
+
+plugin_update() {
+	return 0
+}

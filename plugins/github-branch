@@ -1,0 +1,73 @@
+#!/bin/bash
+
+plugin_isupdatable() {
+	return 0
+}
+
+plugin_isbumpable() {
+	return 0
+}
+
+plugin_getpkgfiles() {
+	echo "${PKGDIR}/${PKGNAME}/files"
+}
+
+plugin_bump() { 
+	local -r PKGREL=$(readSetting "${PKGDIR}"/"${PKGNAME}"/files/PKGBUILD "pkgrel" 0)
+	sed -i "s/pkgrel=.*/pkgrel=$((PKGREL+1))/" "${PKGDIR}"/"${PKGNAME}"/files/PKGBUILD
+}
+
+plugin_getlatestversion() {
+	local -r PKGSETTINGS=${PKGDIR}/${PKGNAME}/settings
+	local -r GITHUBUSER=$(readSetting "${PKGSETTINGS}" "githubuser" "")
+	local -r GITHUBREPO=$(readSetting "${PKGSETTINGS}" "githubrepo" "")
+	local -r GITBRANCH=$(readSetting "${PKGSETTINGS}" "gitbranch" "")
+	local -r GITCOMMIT=$(readSetting "${PKGSETTINGS}" "gitcommit" "")
+	local -r GITHUBURL="https://github.com/${GITHUBUSER}/${GITHUBREPO}.git"
+	local -r ONLINECOMMIT=$(git ls-remote "${GITHUBURL}" | grep "${GITBRANCH}$" | cut -f 1)
+	if [[ "${ONLINECOMMIT}" == "" ]]; then
+		echo "Error in Github API"
+		return 1
+	fi
+	if [[ "${GITCOMMIT}" == "${ONLINECOMMIT}" ]]; then
+		readSetting "${PKGSETTINGS}" "version" "0"
+	else
+		local -r PKGVERSION=$(readSetting "${PKGSETTINGS}" "pkgver" "0")
+		local -r PKGREVISION=$(readSetting "${PKGSETTINGS}" "pkgrev" "0")
+		local -r PKGNEWREVISION=$((PKGREVISION + 1))
+		echo "${PKGVERSION}.r${PKGNEWREVISION}.${ONLINECOMMIT:0:7}-1"
+	fi
+}
+
+plugin_update() {
+	local -r PKGSETTINGS=${PKGDIR}/${PKGNAME}/settings
+	local -r GITHUBUSER=$(readSetting "${PKGSETTINGS}" "githubuser" "")
+	local -r GITHUBREPO=$(readSetting "${PKGSETTINGS}" "githubrepo" "")
+	local -r GITBRANCH=$(readSetting "${PKGSETTINGS}" "gitbranch" "")
+	local -r GITCOMMIT=$(readSetting "${PKGSETTINGS}" "gitcommit" "")
+	local -r GITHUBURL="https://github.com/${GITHUBUSER}/${GITHUBREPO}.git"
+	local -r ONLINECOMMIT=$(git ls-remote "${GITHUBURL}" | grep "${GITBRANCH}$" | cut -f 1)
+	if [[ "${ONLINECOMMIT}" == "" ]]; then
+		echo "Error in Github API"
+		return 1
+	fi
+	if [[ "${GITCOMMIT}" == "${ONLINECOMMIT}" ]]; then
+		return 0
+	fi
+	
+	writeSetting "${PKGSETTINGS}" "gitcommit" "${ONLINECOMMIT}"
+	local -r PKGREVISION=$(readSetting "${PKGSETTINGS}" "pkgrev" "0")
+	writeSetting "${PKGSETTINGS}" "pkgrev" "$((PKGREVISION + 1))"
+	writeSetting "${PKGSETTINGS}" "pkgrel" "1"
+	
+	local -r PKGBUILD="${PKGDIR}/${PKGNAME}/files/PKGBUILD"
+	writeSetting "${PKGBUILD}" "_githubuser" "${GITHUBUSER}"
+	writeSetting "${PKGBUILD}" "_githubrepo" "${GITHUBREPO}"
+	writeSetting "${PKGBUILD}" "_gitcommit" "${ONLINECOMMIT}"
+	writeSetting "${PKGBUILD}" "pkgname" "${PKGNAME}"
+	writeSetting "${PKGBUILD}" "pkgrel" "1"
+	local -r PKGVERSION=$(readSetting "${PKGSETTINGS}" "pkgver" "0")
+	local -r PKGREVISION=$(readSetting "${PKGSETTINGS}" "pkgrev" "0")
+	local -r PKGNEWREVISION=$((PKGREVISION + 1))
+	writeSetting "${PKGBUILD}" "pkgver" "${PKGVERSION}.r${PKGNEWREVISION}.${ONLINECOMMIT:0:7}"
+}

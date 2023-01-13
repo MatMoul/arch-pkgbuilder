@@ -1,0 +1,86 @@
+#!/bin/bash
+
+plugin_isupdatable() {
+	return 0
+}
+
+plugin_isbumpable() {
+	return 0
+}
+
+plugin_getpkgfiles() {
+	echo "${PKGDIR}/${PKGNAME}/files"
+}
+
+plugin_bump() { 
+	local -r PKGREL=$(readSetting "${PKGDIR}"/"${PKGNAME}"/files/PKGBUILD "pkgrel" 0)
+	sed -i "s/pkgrel=.*/pkgrel=$((PKGREL+1))/" "${PKGDIR}"/"${PKGNAME}"/files/PKGBUILD
+}
+
+plugin_getlatestversion() {
+	local -r PKGSETTINGS=${PKGDIR}/${PKGNAME}/settings
+	local -r GITHUBUSER=$(readSetting "${PKGSETTINGS}" "githubuser" "")
+	local -r GITHUBREPO=$(readSetting "${PKGSETTINGS}" "githubrepo" "")
+	local GITHUBTAGNAME=""
+	if ! GITHUBTAGNAME=$(curl -sL "https://api.github.com/repos/${GITHUBUSER}/${GITHUBREPO}/tags" | jq -r ".[0].name"); then
+		echo "Error in Github API"
+		return 1
+	fi
+	if [ "${GITHUBTAGNAME}" == "" ]; then
+		echo "Error in Github API"
+		return 1
+	fi
+	local -r GITHUBVERSION=${GITHUBTAGNAME//[[:alpha:]]/}
+	if [ "${GITHUBVERSION}" == "" ]; then
+		echo "Error in Github API"
+		return 1
+	fi
+	local -r PKGVERSION=$(readSetting "${PKGSETTINGS}" "pkgver" "0")
+	if [[ "${PKGVERSION}" == "${GITHUBVERSION}" ]]; then
+		readSetting "${PKGSETTINGS}" "version" "0"
+	else
+		echo "${GITHUBVERSION}-1"
+	fi
+}
+
+plugin_update() {
+	local -r PKGSETTINGS=${PKGDIR}/${PKGNAME}/settings
+	local -r GITHUBUSER=$(readSetting "${PKGSETTINGS}" "githubuser" "")
+	local -r GITHUBREPO=$(readSetting "${PKGSETTINGS}" "githubrepo" "")
+	local GITHUBTAGNAME=""
+	if ! GITHUBTAGNAME=$(curl -sL "https://api.github.com/repos/${GITHUBUSER}/${GITHUBREPO}/tags" | jq -r ".[0].name"); then
+		echo "Error in Github API"
+		return 1
+	fi
+	if [ "${GITHUBTAGNAME}" == "" ]; then
+		echo "Error in Github API"
+		return 1
+	fi
+	local -r GITHUBVERSION=${GITHUBTAGNAME//[[:alpha:]]/}
+	if [ "${GITHUBVERSION}" == "" ]; then
+		echo "Error in Github API"
+		return 1
+	fi
+	local -r PKGVERSION=$(readSetting "${PKGSETTINGS}" "pkgver" "0")
+	if [[ "${PKGVERSION}" == "${GITHUBVERSION}" ]]; then
+		return 0
+	fi
+	
+	writeSetting "${PKGSETTINGS}" "pkgrel" "1"
+
+	local -r PKGBUILD="${PKGDIR}/${PKGNAME}/files/PKGBUILD"
+	writeSetting "${PKGBUILD}" "_githubuser" "${GITHUBUSER}"
+	writeSetting "${PKGBUILD}" "_githubrepo" "${GITHUBREPO}"
+	writeSetting "${PKGBUILD}" "_pkgtagname" "${GITHUBTAGNAME}"
+	writeSetting "${PKGBUILD}" "pkgname" "${PKGNAME}"
+	writeSetting "${PKGBUILD}" "pkgrel" "1"
+	writeSetting "${PKGBUILD}" "pkgver" "${GITHUBVERSION}"
+	
+	local TMPDIR=""
+	TMPDIR=$(mktemp -d)
+	cp -r "${PKGDIR}"/"${PKGNAME}"/files/* "${TMPDIR}"
+	chown -R pkgbuilder "${TMPDIR}"
+	sudo -u pkgbuilder updpkgsums "${TMPDIR}"/PKGBUILD
+	cp -r "${TMPDIR}"/PKGBUILD "${PKGDIR}/${PKGNAME}/files/"
+	rm -rf "${TMPDIR}"
+}

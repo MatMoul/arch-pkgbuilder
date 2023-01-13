@@ -1,0 +1,6 @@
+[Unit]
+Description=pkgbuilder
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/pkgbuilder checkupdateall --notify

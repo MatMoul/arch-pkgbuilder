@@ -1,0 +1,25 @@
+#!/bin/bash
+
+plugin_isupdatable() {
+	return 1
+}
+
+plugin_isbumpable() {
+	return 0
+}
+
+plugin_getpkgfiles() {
+	local TMPDIR=""
+	TMPDIR=$(mktemp -d)
+	cp -r "${PKGDIR}"/"${PKGNAME}"/files/* "${TMPDIR}"
+	chown -R pkgbuilder "${TMPDIR}"
+	sudo -u pkgbuilder updpkgsums "${TMPDIR}"/PKGBUILD
+	cp -r "${TMPDIR}"/PKGBUILD "${PKGDIR}/${PKGNAME}/files/"
+	rm -rf "${TMPDIR}"
+	echo "${PKGDIR}/${PKGNAME}/files"
+}
+
+plugin_bump() {
+	local -r PKGREL=$(readSetting "${PKGDIR}"/"${PKGNAME}"/files/PKGBUILD "pkgrel" 0)
+	sed -i "s/pkgrel=.*/pkgrel=$((PKGREL+1))/" "${PKGDIR}"/"${PKGNAME}"/files/PKGBUILD
+}

@@ -1,0 +1,29 @@
+# Maintainer: user <user at the google email domain which is .com>
+
+_githubuser=
+_githubrepo=
+_gitcommit=
+
+pkgname=
+pkgver=0
+pkgrel=0
+pkgdesc='Desc'
+arch=('any')
+url="https://github.com/${_githubuser}/${_githubrepo}"
+#license=('GPL3')
+#depends=()
+makedepends=('git')
+#optdepends=()
+#install="${pkgname}.install"
+#provides=()
+#backup=()
+source=("git+https://github.com/${_githubuser}/${_githubrepo}.git#commit=${_gitcommit}")
+sha256sums=('SKIP')
+
+build() {
+	cd "${_githubrepo}"
+}
+
+package() {
+	cd "${_githubrepo}"
+}

@@ -1,0 +1,2 @@
+type=dir
+dest=/var/lib/pkgbuilder/repos/local-test

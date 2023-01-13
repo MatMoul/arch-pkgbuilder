@@ -1,0 +1,16 @@
+#plugin=manual
+#PluginInfos...
+
+#target=local-test
+
+#base=arch-base
+#mirror=https...
+#repos=testing matmoul|https...)
+#pkgs=git systemd
+#nodeps=1
+#dbgmode=1
+
+#version=0.0.0-0
+#builddate=date
+#lastbuilddate=date
+#lastbuildstatus=Ok|Error

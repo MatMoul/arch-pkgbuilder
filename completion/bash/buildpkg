@@ -1,0 +1,41 @@
+#!/bin/bash
+
+_buildpkg() {
+	# shellcheck disable=SC2034
+	local cur prev words cword args
+	_init_completion || return
+	
+	local -r cmdargs="-w --workdir -b --basedirname -u --builduser -m --mirror -d --mount -r --repo -p --pkgs -o --output"
+	local -r cnfargs="--help -n --nodeps --dbg"
+	
+	if [[ ${COMP_WORDS[*]} == *"--help"* ]]; then
+		return
+	fi
+
+	args=${cmdargs}
+	for arg in ${cmdargs}; do
+		if [[ ${COMP_WORDS[*]} == *" ${arg} "* ]]; then
+			args=""
+		fi
+	done
+	for arg in ${cnfargs}; do
+		if [[ ${COMP_WORDS[*]} != *"${arg}"* ]]; then
+			args+=" ${arg}"
+		fi
+	done
+	
+	case $prev in
+		--help)
+			return
+		;;
+		-w | --workdir | -d | --mount | -o | --output)
+			_filedir -d
+			return
+		;;
+		*)
+			# shellcheck disable=SC2207
+			COMPREPLY=($(compgen -W "${args}" -- "${COMP_WORDS[COMP_CWORD]}"))
+			return
+		;;
+	esac
+} && complete -F _buildpkg buildpkg

@@ -1,0 +1,19 @@
+# Maintainer: me <me at the google email domain which is .com>
+
+pkgname=pkgname
+pkgver=0.0.0
+pkgrel=0
+pkgdesc="Desc"
+arch=('any')
+url='url'
+license=('GPL3')
+#depends=()
+#makedepends=()
+#optdepends=()
+#source=("${pkgname}::git+https://url.git")
+#md5sums=('SKIP')
+#backup=()
+
+package() {
+	cd ${pkgname}
+}

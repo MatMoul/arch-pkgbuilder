@@ -1,0 +1,56 @@
+#!/bin/bash
+
+_pkgbuilder() {
+	# shellcheck disable=SC2034
+	local cur prev words cword args
+	_init_completion || return
+	
+	local -r cmdargs="list info create build bump checkupdate update checkupdateall updateall"
+	local -r cnfargs="--help --cnf --notify --nopush --dry-run --dbg"
+	#local cnffile=/etc/pkgbuilder/config
+	local pkgdir="/etc/pkgbuilder/packages"
+	local modeldir="/usr/share/pkgbuilder/models"
+	
+	if [[ ${COMP_WORDS[*]} == *"--help"* ]]; then
+		return
+	fi
+
+	args=${cmdargs}
+	for arg in ${cmdargs}; do
+		if [[ ${COMP_WORDS[*]} == *" ${arg} "* ]]; then
+			args=""
+		fi
+	done
+	for arg in ${cnfargs}; do
+		if [[ ${COMP_WORDS[*]} != *"${arg}"* ]]; then
+			args+=" ${arg}"
+		fi
+	done
+	
+	case $prev in
+		--help)
+			return
+		;;
+		--cnf)
+			_filedir
+			return
+		;;
+		create)
+			local -r MDLLIST=$(\ls ${modeldir})
+			# shellcheck disable=SC2207
+			COMPREPLY=($(compgen -W "${MDLLIST}" -- "${COMP_WORDS[COMP_CWORD]}"))
+			return
+		;;
+		info | build | bump | checkupdate | update)
+			local -r PKGLIST=$(\ls ${pkgdir})
+			# shellcheck disable=SC2207
+			COMPREPLY=($(compgen -W "${PKGLIST}" -- "${COMP_WORDS[COMP_CWORD]}"))
+			return
+		;;
+		*)
+			# shellcheck disable=SC2207
+			COMPREPLY=($(compgen -W "${args}" -- "${COMP_WORDS[COMP_CWORD]}"))
+			return
+		;;
+	esac
+} && complete -F _pkgbuilder pkgbuilder

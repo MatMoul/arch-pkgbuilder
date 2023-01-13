@@ -1,0 +1,4 @@
+plugin=github-tag
+target=local-test
+githubuser=
+githubrepo=

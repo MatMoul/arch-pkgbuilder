@@ -1,0 +1,199 @@
+#!/bin/bash
+
+help() {
+	echo "buildpkg [options] pkgdir"
+	echo "-w | --workdir dir"
+	echo "-b | --basedirname dirname"
+	echo "-u | --builduser username"
+	echo "-m | --mirror url"
+	echo "-d | --mount dir"
+	echo "-r | --repo name"
+	echo "-r | --repo name|url"
+	echo "-p | --pkgs pkglist"
+	echo "-o | --outputdir dir"
+	echo "-n | --nodeps"
+	echo "--dbg"
+	echo "--help"
+}
+
+build() {
+	BASEDIR=${WORKDIR}/${BASEDIRNAME}
+	BUILDDIR=${WORKDIR}/${BUILDDIRNAME}
+	if ! checkbuildbase; then
+		return 1
+	fi
+	if ! createbuildroot; then
+		cleanbuildroot
+		return 1
+	fi
+	if ! configurebuildroot; then
+		cleanbuildroot
+		return 1
+	fi
+	if ! buildpkg; then
+		cleanbuildroot
+		return 1
+	fi
+	cleanbuildroot
+}
+checkbuildbase() {
+	if [ ! -d "${WORKDIR}" ]; then
+		if ! mkdir -p "${WORKDIR}"; then
+			return 1
+		fi
+	fi
+	if [ -d "${BASEDIR}" ]; then
+		cp /etc/resolv.conf "${BASEDIR}"/etc/
+		cp /etc/pacman.d/mirrorlist "${BASEDIR}"/etc/pacman.d/
+		if ! systemd-nspawn -a -D "${BASEDIR}" pacman -Syu --noconfirm; then
+			return 1
+		fi
+	else
+		if [[ $(stat -f -c %T "${WORKDIR}") == "btrfs" ]]; then
+			if ! btrfs subvolume create "${BASEDIR}"; then
+				return 1
+			fi
+		else
+			if ! mkdir -p "${BASEDIR}"; then
+				return 1
+			fi
+		fi
+		mkdir -p "${BASEDIR}"/var/lib/pacman
+		if ! pacman -Sy -r "${BASEDIR}" --noconfirm base-devel; then
+			return 1
+		fi
+		cp /etc/resolv.conf "${BASEDIR}"/etc/
+		cp /etc/pacman.d/mirrorlist "${BASEDIR}"/etc/pacman.d/
+		if ! systemd-nspawn -a -D "${BASEDIR}" pacman-key --init; then
+			return 1
+		fi
+		if ! systemd-nspawn -a -D "${BASEDIR}" pacman-key --populate; then
+			return 1
+		fi
+	fi
+}
+createbuildroot() {
+	if [ -d "${BUILDDIR}" ]; then
+		if ! rm -r "${BUILDDIR}"; then
+			return 1
+		fi
+	fi
+	if [[ $(stat -f -c %T "${WORKDIR}") == "btrfs" ]]; then
+		if ! btrfs subvolume snapshot "${BASEDIR}" "${BUILDDIR}"; then
+			return 1
+		fi
+	else
+		# CAUTION: /tmp is mounted with nosuid and is not useable as is
+		if ! cp -r "${BASEDIR}" "${BUILDDIR}"; then
+			return 1
+		fi
+	fi
+	if [[ "${MOUNTDIR}" != "" ]]; then
+		mkdir -p "${BUILDDIR}${MOUNTDIR}"
+		mount -o bind -o ro "${MOUNTDIR}" "${BUILDDIR}${MOUNTDIR}"
+	fi
+	sed -i -e '/ParallelDownloads/ s/^#*/#/' "${BUILDDIR}"/etc/pacman.conf
+	sed -i -e '/MAKEFLAGS=/ s/^#*/#/' "${BUILDDIR}"/etc/makepkg.conf
+	local -r CPUCORES=$(grep -c ^processor /proc/cpuinfo)
+	sed -i "s/^MAKEFLAGS=.*/MAKEFLAGS=\"-j${CPUCORES}\"/" "${BUILDDIR}"/etc/makepkg.conf
+}
+configurebuildroot() {
+	if ! systemd-nspawn -a -D "${BUILDDIR}" useradd -r -m "${BUILDUSER}"; then
+		return 1
+	fi
+	echo "${BUILDUSER} ALL=(root) NOPASSWD: /usr/bin/pacman" > "${BUILDDIR}"/etc/sudoers.d/"${BUILDUSER}"
+	if ! cp -r "${PKGDIR}" "${BUILDDIR}"/home/"${BUILDUSER}"/pkg; then
+		return 1
+	fi
+	if ! systemd-nspawn -a -D "${BUILDDIR}" chown -R "${BUILDUSER}":"${BUILDUSER}" /home/"${BUILDUSER}"/pkg; then
+		return 1
+	fi
+	if [ "${MIRROR}" != "" ]; then
+		echo "Server = ${MIRROR}" > "${BUILDDIR}"/etc/pacman.d/mirrorlist
+	fi
+
+	if [ "${REPOS}" != "" ]; then
+		for REPODATA in "${REPOS[@]}"; do
+			readarray -d "|" -t REPOITEMS<<<"${REPODATA}"
+			if [ "${REPOITEMS[1]}" == "" ]; then
+				if grep "\[${REPODATA}\]" /etc/pacman.conf; then
+					sed -i -e "/\[${REPODATA}\]/ {s/#//;}" "${BUILDDIR}"/etc/pacman.conf
+					sed -i -e "/\[${REPODATA}\]/ {n;s/#//;}" "${BUILDDIR}"/etc/pacman.conf
+				else
+					echo -e "\n[${REPODATA}]\nInclude = /etc/pacman.d/mirrorlist" >> "${BUILDDIR}"/etc/pacman.conf
+				fi
+			else
+				echo -e "\n[${REPOITEMS[0]}]\nSigLevel = Optional TrustAll\nServer = ${REPOITEMS[1]}" >> "${BUILDDIR}"/etc/pacman.conf
+			fi
+		done
+		if ! systemd-nspawn -a -D "${BUILDDIR}" pacman -Sy; then
+			return 1
+		fi
+	fi
+	if [ "${PKGS}" != "" ]; then
+		if ! systemd-nspawn -a -D "${BUILDDIR}" pacman -S --needed --noconfirm "${PKGS[@]}"; then
+			return 1
+		fi
+	fi
+}
+buildpkg() {
+	if [ ${NODEPS} == 0 ]; then
+		if ! systemd-nspawn -a -D "${BUILDDIR}" --chdir=/home/"${BUILDUSER}"/pkg --user="${BUILDUSER}" makepkg -s --needed --noconfirm; then
+			return 1
+		fi
+	else
+		if ! systemd-nspawn -a -D "${BUILDDIR}" --chdir=/home/"${BUILDUSER}"/pkg --user="${BUILDUSER}" makepkg -s -d --needed --noconfirm; then
+			return 1
+		fi
+	fi
+	if ! cp "${BUILDDIR}"/home/"${BUILDUSER}"/pkg/*.pkg.tar.zst "${OUTPUTDIR}"; then
+		return 1
+	fi
+}
+cleanbuildroot() {
+	if [[ "${MOUNTDIR}" != "" ]]; then
+		umount "${BUILDDIR}${MOUNTDIR}"
+	fi
+	if [ ${DBGMODE} == 0 ]; then
+		rm -r "${BUILDDIR}"
+	fi
+}
+
+if [ ${#} == 0 ]; then
+	help
+	exit 1
+fi
+
+PKGDIR=${*: -1}
+WORKDIR=/var/cache/pkgbuilder/
+BASEDIRNAME=arch-base
+BASEDIR=""
+BUILDDIRNAME=$(date "+%Y-%m-%d_%H-%M-%S")
+BUILDDIR=""
+BUILDUSER=pkgbuilder
+MOUNTDIR=""
+MIRROR=""
+REPOS=()
+PKGS=()
+OUTPUTDIR=$(pwd)
+NODEPS=0
+DBGMODE=0
+
+while [[ ${#} -gt 0 ]]; do
+  case ${1} in
+		--help) help; exit 0;;
+    -w | --workdir) WORKDIR="${2}"; shift; shift;;
+    -b | --basedirname) BASEDIRNAME="${2}"; shift; shift;;
+    -u | --builduser) BUILDUSER="${2}"; shift; shift;;
+		-d | --mount) MOUNTDIR=${2}; shift; shift;;
+    -m | --mirror) MIRROR="${2}"; shift; shift;;
+    -r | --repo) REPOS+=("${2}"); shift; shift;;
+    -p | --pkgs) PKGS+=("${2}"); shift; shift;;
+    -o | --outputdir) OUTPUTDIR="${2}"; shift; shift;;
+    -n | --nodeps) NODEPS=1; shift;;
+    --dbg) DBGMODE=1; shift;;
+    *) shift;;
+  esac
+done
+
+build

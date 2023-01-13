@@ -1,0 +1,388 @@
+#!/bin/bash
+
+showHelp() {
+	echo "arch-pkg-builder"
+	echo "----------------"
+	echo "arch-pkg-builder [args] command [args]"
+	echo ""
+	echo "command :"
+	echo "	list                 List packages infos"
+	echo "	infos pkgname        Display package infos"
+	echo "	build pkgname        Build and publish package"
+	echo "	bump pkgname         Bump release and publish package"
+	echo "	checkupdate pkgname   Check package update"
+	echo "	checkupdateall        Check all packages update"
+	echo "	update pkgname        Update package"
+	echo "	updateall             Update all packages"
+	echo ""
+	echo "args :"
+	echo "	--cnf configfile"
+	echo "	--notify"
+	echo "	--nopush"
+	echo "	--dry-run"
+	echo "	--dbg"
+}
+
+readSetting() { # $1=filename $2=name $3=defaultvalue
+	local -r LINE=$(grep "^${2}=" "${1}")
+	local -r VALUE=${LINE/${2}=/}
+	if [ "${VALUE}" != "" ]; then
+		echo "${VALUE}"
+	else
+		echo "${3}"
+	fi
+}
+writeSetting() { #$1=filename $2=valuename $3=value
+	local -r LINE=$(grep "^${2}=" "${1}")
+	if [ "${LINE}" != "" ]; then
+		sed -i "s/^${2}=.*/${2}=${3}/" "${1}"
+	else
+		echo "${2}=${3}" >> "${1}"
+	fi
+}
+tblCell() { #$1=Text $2=Size
+	local CELL=""
+	CELL=$(printf "%-${2}s")
+	CELL="${1}${CELL}"
+	CELL=${CELL:0:${2}}
+	echo "${CELL}"
+}
+getPluginFile() { # $1=PKGDIR $2=PKGNAME $3=PLUGINDIR
+	local -r PKGDIR=${1}
+	local -r PKGNAME=${2}
+	local -r PLUGINDIR=${3}
+	local -r PLUGIN=$(readSetting "${PKGDIR}"/"${PKGNAME}"/settings "plugin" "manual")
+	if [ "${PLUGIN}" == "custom" ]; then
+		if [ ! -f "${PKGDIR}"/"${PKGNAME}"/plugin ]; then
+			return 1
+		fi
+		echo "${PKGDIR}"/"${PKGNAME}"/plugin
+	else
+		if [ ! -f "${PLUGINDIR}"/"${PLUGIN}" ]; then
+			return 1
+		fi
+		echo "${PLUGINDIR}"/"${PLUGIN}"
+	fi
+}
+notify() {
+	if [ ${NOTIFY} == 0 ]; then
+		return 0
+	fi
+	if [ "${NOTIFYMSG}" == "" ]; then
+		return 0
+	fi
+	if [ ! -f /usr/bin/sendmail ]; then
+		return 0
+	fi
+	local EMAIL=""
+	EMAIL=$(readSetting "${CNFFILE}" "EMAIL" "")
+	if [ "${EMAIL}" == "" ]; then
+		return 0
+	fi
+	echo -e "subject:PKGBuilder - Notifications\n${NOTIFYMSG}" | sendmail "${EMAIL}"
+}
+
+pkgList() {
+	if [ ! -d "${PKGDIR}" ]; then
+		return 1
+	fi
+	for PKGDIRNAME in "${PKGDIR}"/*; do
+		[[ -e "${PKGDIRNAME}" ]] || break
+		local PKGNAME=""
+		PKGNAME=$(basename "${PKGDIRNAME}")
+		local VALUES=()
+		VALUES+=("$(tblCell "${PKGNAME}" 30)")
+		VALUE=$(tblCell "$(readSetting "${PKGDIRNAME}"/settings version)" 24)
+		VALUES+=("${VALUE}")
+		VALUES+=("$(tblCell "$(readSetting "${PKGDIRNAME}"/settings plugin)" 20)")
+		VALUES+=("$(tblCell "$(readSetting "${PKGDIRNAME}"/settings target)" 20)")
+		VALUE=$(tblCell "$(readSetting "${PKGDIRNAME}"/settings lastbuilddate)" 20)
+		VALUES+=("${VALUE}")
+		VALUES+=("$(readSetting "${PKGDIRNAME}"/settings lastbuildstatus)")
+		echo "${VALUES[@]}"
+	done
+}
+pkgInfos() { # $1=PKGNAME
+	local -r PKGNAME=${1}
+	if [ ! -f "${PKGDIR}"/"${PKGNAME}"/settings ]; then
+		return 1
+	fi
+	cat "${PKGDIR}"/"${PKGNAME}"/settings
+}
+pkgCreate() { # $1=PKGNAME $2=MODELNAME
+	local -r PKGNAME=${1}
+	local -r MODELNAME=${2}
+	if [ ! -d "${MODELDIR}"/"${MODELNAME}" ]; then
+		return 1
+	fi
+	cp -r "${MODELDIR}"/"${MODELNAME}" "${PKGDIR}"/"${PKGNAME}"
+}
+pkgBuild() { # $1=PKGNAME
+	local -r PKGNAME=${1}
+	local -r BUILDDATE=$(date "+%Y.%m.%d %H:%M:%S")
+	if [[ "${DRYRUN}" == "0" ]]; then
+		writeSetting "${PKGDIR}"/"${PKGNAME}"/settings "lastbuilddate" "${BUILDDATE}"
+	fi
+	local PLUGINFILE=""
+	if ! PLUGINFILE=$(getPluginFile "${PKGDIR}" "${PKGNAME}" "${PLUGINDIR}"); then
+		return 1
+	fi
+	. "${PLUGINFILE}"
+	local PKGFILES=""
+	if ! PKGFILES=$(plugin_getpkgfiles "${PKGDIR}" "${PKGNAME}"); then
+		if [[ "${DRYRUN}" == "0" ]]; then
+			writeSetting "${PKGDIR}"/"${PKGNAME}"/settings "lastbuildstatus" "Error - No PKG files provided"
+		fi
+		return 1
+	fi
+	if [ ! -d "${PKGFILES}" ]; then
+		if [[ "${DRYRUN}" == "0" ]]; then
+			writeSetting "${PKGDIR}"/"${PKGNAME}"/settings "lastbuildstatus" "Error - PKG files not found"
+		fi
+		return 1
+	fi
+	mkdir "${WORKDIR}"/.output
+	local BUILDARGS=()
+	BUILDARGS+=(-w "${WORKDIR}")
+	BUILDARGS+=(-d /var/lib/pkgbuilder)
+	BUILDARGS+=(-o "${WORKDIR}"/.output)
+	local -r PKGMIRROR=$(readSetting "${PKGDIR}"/"${PKGNAME}"/settings "mirror" "")
+	if [[ "${PKGMIRROR}" != "" ]]; then
+		BUILDARGS+=(-m "${PKGMIRROR}")
+	fi
+	# shellcheck disable=SC2207
+	local -r PKGPKGS=($(readSetting "${PKGDIR}"/"${PKGNAME}"/settings "pkgs" ""))
+	if [[ "${PKGPKGS[*]}" != "" ]]; then
+					for PKGPKG in "${PKGPKGS[@]}"; do  
+									BUILDARGS+=(-p "${PKGPKG}")
+					done
+	fi
+	local -r PKGNODEPS=$(readSetting "${PKGDIR}"/"${PKGNAME}"/settings "nodeps" "")
+	if [[ "${PKGNODEPS}" == "1" ]]; then
+		BUILDARGS+=(-n)
+	fi
+	# shellcheck disable=SC2207
+	local -r PKGREPOS=($(readSetting "${PKGDIR}"/"${PKGNAME}"/settings "repos" ""))
+	if [[ "${PKGREPOS[*]}" != "" ]]; then
+		for PKGREPO in "${PKGREPOS[@]}"; do
+			BUILDARGS+=(-r "${PKGREPO}")
+		done
+	fi
+	if [[ "${DBGMODE}" == "1" ]]; then
+		BUILDARGS+=(--dbg)
+	fi
+	BUILDARGS+=("${PKGFILES}")
+	# shellcheck disable=SC2068
+	if ! buildpkg ${BUILDARGS[@]}; then
+		if [[ "${DRYRUN}" == "0" ]]; then
+			writeSetting "${PKGDIR}"/"${PKGNAME}"/settings "lastbuildstatus" "Error - Build"
+		fi
+		return 1
+	fi
+	local PKGFILENAME=""
+	PKGFILENAME=$(ls "${WORKDIR}"/.output/"${PKGNAME}"*.pkg.tar.zst)
+	local VERSION=""
+	VERSION=$(pacman -Qp "${PKGFILENAME}" | awk -F ' ' '{print $2}')
+	if [[ "${DRYRUN}" == "0" ]]; then
+		writeSetting "${PKGDIR}"/"${PKGNAME}"/settings "version" "${VERSION}"
+		writeSetting "${PKGDIR}"/"${PKGNAME}"/settings "builddate" "${BUILDDATE}"
+		writeSetting "${PKGDIR}"/"${PKGNAME}"/settings "lastbuildstatus" "Ok"
+	fi
+	local -r PKGTARGET=$(readSetting "${PKGDIR}"/"${PKGNAME}"/settings "target" "")
+	if [[ "${DRYRUN}" == "0" ]]; then
+		if [[ "${NOPUSH}" == "0" ]]; then
+			if [ ! -d "${VARDIR}"/packages/"${PKGTARGET}" ]; then
+				mkdir -p "${VARDIR}"/packages/"${PKGTARGET}"
+			fi
+			cp "${PKGFILENAME}" "${VARDIR}"/packages/"${PKGTARGET}"
+		fi
+	fi
+	pkgPush "${PKGNAME}" "${PKGFILENAME}"
+	rm -r "${WORKDIR}"/.output
+}
+pkgPush() { # $1=PKGNAME $2=PKGFILE
+	local -r PKGNAME=${1}
+	local -r PKGFILE=${2}
+
+	if [[ ${NOPUSH} == 0 ]]; then
+		local -r PKGTARGET=$(readSetting "${PKGDIR}"/"${PKGNAME}"/settings "target" "")
+		if [ -f "${TRGDIR}"/"${PKGTARGET}" ]; then
+			local -r PKGTARGETTYPE=$(readSetting "${TRGDIR}"/"${PKGTARGET}" "type" "")
+			local -r TARGETDEST=$(readSetting "${TRGDIR}"/"${PKGTARGET}" "dest" "")
+			if [[ "${DRYRUN}" == "0" ]]; then
+				case ${PKGTARGETTYPE} in
+					dir)
+						if [ -d "${TARGETDEST}" ]; then
+							local -r TARGETFILENAME=${TARGETDEST}/$(basename "${PKGFILE}")
+							cp "${PKGFILE}" "${TARGETFILENAME}"
+							repo-add -n -R "${TARGETDEST}/${PKGTARGET}.db.tar.zst" "${TARGETFILENAME}"
+						fi
+					;;
+					ssh)
+						local -r TARGETPUBKEY=$(readSetting "${TRGDIR}"/"${PKGTARGET}" "pubkey" "")
+						local -r TARGETSRV=$(awk -F':/' '{print $1}' <<< "${TARGETDEST}")
+						local -r TARGETDIR=/$(awk -F':/' '{print $2}' <<< "${TARGETDEST}")
+						local -r TARGETFILENAME=${TARGETDEST}/$(basename "${PKGFILE}")
+						if [ "${TARGETPUBKEY}" == "" ]; then
+							scp "${PKGFILE}" "${TARGETDEST}"
+							ssh "${TARGETSRV}" repo-add -n -R "${TARGETDIR}"/"${PKGTARGET}".db.tar.zst "${TARGETDIR}"/"$(basename "${TARGETFILENAME}")"
+						else
+							scp -i "${TARGETPUBKEY}" "${PKGFILE}" "${TARGETDEST}"
+							ssh -i "${TARGETPUBKEY}" "${TARGETSRV}" repo-add -n -R "${TARGETDIR}"/"${PKGTARGET}".db.tar.zst "${TARGETDIR}"/"$(basename "${TARGETFILENAME}")"
+						fi
+					;;
+				esac
+			fi
+		fi
+	fi
+}
+pkgBump() { # $1=PKGNAME
+	local -r PKGNAME=${1}
+	
+	local PLUGINFILE=""
+	if ! PLUGINFILE=$(getPluginFile "${PKGDIR}" "${PKGNAME}" "${PLUGINDIR}"); then
+		return 1
+	fi
+	. "${PLUGINFILE}"
+	if ! plugin_isbumpable; then
+		return 1
+	fi
+	
+	if [[ "${DRYRUN}" == "0" ]]; then
+		if ! plugin_bump "${PKGDIR}" "${PKGNAME}"; then
+			return 1
+		fi
+		pkgBuild "${PKGNAME}"
+	fi
+}
+pkgCheckUpdate() { # $1=PKGNAME
+	local -r PKGNAME=${1}
+	
+	local PLUGINFILE=""
+	if ! PLUGINFILE=$(getPluginFile "${PKGDIR}" "${PKGNAME}" "${PLUGINDIR}"); then
+		return 1
+	fi
+	. "${PLUGINFILE}"
+	local -r PKGVERSION=$(readSetting "${PKGDIR}"/"${PKGNAME}"/settings "version" "0")
+	local -r PKGPLUGIN=$(readSetting "${PKGDIR}"/"${PKGNAME}"/settings "plugin" "")
+	local VALUES=()
+	VALUES+=("$(tblCell "${PKGNAME}" 30)")
+	VALUE=$(tblCell "$(readSetting "${PKGDIR}"/"${PKGNAME}"/settings version)" 24)
+	VALUES+=("${VALUE}")
+	if ! plugin_isupdatable; then
+		VALUES+=("    ")
+		VALUES+=("$(tblCell 'Skipping' 25)")
+		VALUES+=("$(tblCell "${PKGPLUGIN}" 25)")
+		echo "${VALUES[@]}"
+		return 0
+	fi
+	local -r ONLINEVERSION=$(plugin_getlatestversion)
+	if [ "${ONLINEVERSION}" == "" ]; then
+		return 1
+	fi
+	if [[ "${ONLINEVERSION}" != "${PKGVERSION}" ]]; then
+		VALUES+=(" -> ")
+		VALUES+=("$(tblCell "${ONLINEVERSION}" 25)")
+		NOTIFYMSG+="${PKGNAME} ${PKGVERSION} -> ${ONLINEVERSION}\n"
+	else
+		VALUES+=("    ")
+		VALUES+=("$(tblCell 'Up to date' 25)")
+	fi
+	VALUES+=("$(tblCell "${PKGPLUGIN}" 25)")
+	echo "${VALUES[@]}"
+}
+pkgCheckUpdateAll() {
+	if [ ! -d "${PKGDIR}" ]; then
+		return 1
+	fi
+	for PKGDIRNAME in "${PKGDIR}"/*; do
+		[[ -e "${PKGDIRNAME}" ]] || break
+		local PKGNAME=""
+		PKGNAME=$(basename "${PKGDIRNAME}")
+		pkgCheckUpdate "${PKGNAME}"
+	done
+	notify
+}
+pkgUpdate() { # $1=PKGNAME
+	local -r PKGNAME=${1}
+	
+	local PLUGINFILE=""
+	if ! PLUGINFILE=$(getPluginFile "${PKGDIR}" "${PKGNAME}" "${PLUGINDIR}"); then
+		return 1
+	fi
+	. "${PLUGINFILE}"
+	if ! plugin_isupdatable; then
+		return 1
+	fi
+	
+	local -r ONLINEVERSION=$(plugin_getlatestversion)
+	if [ "${ONLINEVERSION}" == "" ]; then
+		return 1
+	fi
+	local -r PKGVERSION=$(readSetting "${PKGDIR}"/"${PKGNAME}"/settings "version" "0")
+	if [[ "${ONLINEVERSION}" == "${PKGVERSION}" ]]; then
+		return 0
+	fi
+
+	if ! plugin_update; then
+		return 1
+	fi
+
+	pkgBuild "${PKGNAME}"
+}
+pkgUpdateAll() {
+	if [ ! -d "${PKGDIR}" ]; then
+		return 1
+	fi
+	for PKGDIRNAME in "${PKGDIR}"/*; do
+		[[ -e "${PKGDIRNAME}" ]] || break
+		local PKGNAME=""
+		PKGNAME=$(basename "${PKGDIRNAME}")
+		pkgUpdate "${PKGNAME}"
+	done
+}
+
+CNFFILE="/etc/pkgbuilder/config"
+ARGCMD=""
+ARGPKG=""
+ARGMDL=""
+NOTIFYMSG=""
+NOTIFY=0
+NOPUSH=0
+DRYRUN=0
+DBGMODE=0
+
+while [[ ${#} -gt 0 ]]; do
+  case ${1} in
+		--help) showHelp; exit 0;;
+		list | checkupdateall | updateall) ARGCMD="${1}"; shift;;
+		infos | build | bump | checkupdate | update) ARGCMD="${1}"; ARGPKG="${2}"; shift; shift;;
+		create) ARGCMD="${1}"; ARGMDL="${2}"; ARGPKG="${3}"; shift; shift;;
+		--cnf) CNFFILE="${2}"; shift; shift;;
+		--notify) NOTIFY=1; shift;;
+		--nopush) NOPUSH=1; shift;;
+		--dry-run) DRYRUN=1; shift;;
+		--dbg) DBGMODE=1; shift;;
+		*) shift;;
+  esac
+done
+
+PKGDIR=$(readSetting "${CNFFILE}" "PKGDIR" "/etc/pkgbuilder/packages")
+TRGDIR=$(readSetting "${CNFFILE}" "TRGDIR" "/etc/pkgbuilder/targets")
+PLUGINDIR=$(readSetting "${CNFFILE}" "PLUGINDIR" "/usr/share/pkgbuilder/plugins")
+MODELDIR=$(readSetting "${CNFFILE}" "MODELDIR" "/usr/share/pkgbuilder/models")
+WORKDIR=$(readSetting "${CNFFILE}" "WORKDIR" "/var/cache/pkgbuilder")
+VARDIR=$(readSetting "${CNFFILE}" "VARDIR" "/var/lib/pkgbuilder")
+
+case ${ARGCMD} in
+	list) pkgList;;
+	infos) pkgInfos "${ARGPKG}";;
+	create) pkgCreate "${ARGPKG}" "${ARGMDL}";;
+	build) pkgBuild "${ARGPKG}";;
+	bump) pkgBump "${ARGPKG}";;
+	checkupdate) pkgCheckUpdate "${ARGPKG}";;
+	checkupdateall) pkgCheckUpdateAll;;
+	update) pkgUpdate "${ARGPKG}";;
+	updateall) pkgUpdateall;;
+	*) showHelp; exit 1;;
+esac

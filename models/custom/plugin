@@ -1,0 +1,25 @@
+#!/bin/bash
+
+custom_plugin_isupdatable() {
+	return 1
+}
+
+custom_plugin_isbumpable() {
+	return 1
+}
+
+custom_plugin_getpkgfiles() {
+	return 1
+}
+
+custom_plugin_bump() {
+	return 1
+}
+
+custom_plugin_getlatestversion() {
+	return 1
+}
+
+custom_plugin_update() {
+	return 1
+}

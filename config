@@ -1,0 +1,7 @@
+#PKGDIR="/etc/pkgbuilder/packages"
+#TRGDIR="/etc/pkgbuilder/targets"
+#PLUGINDIR="/usr/share/pkgbuilder/plugins"
+#MODELDIR="/usr/share/pkgbuilder/models"
+#WORKDIR="/var/cache/pkgbuilder"
+#VARDIR="/var/lib/pkgbuilder"
+#EMAIL=email@email.com

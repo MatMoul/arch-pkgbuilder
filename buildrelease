@@ -1,0 +1,54 @@
+#!/bin/bash
+
+readSetting() { # $1=filename $2=name $3=defaultvalue
+	local -r LINE=$(grep "^${2}=" "${1}")
+	local -r VALUE=${LINE/${2}=/}
+	if [ "${VALUE}" != "" ]; then
+		echo "${VALUE}"
+	else
+		echo "${3}"
+	fi
+}
+writeSetting() { #$1=filename $2=valuename $3=value
+	local -r LINE=$(grep "^${2}=" "${1}")
+	if [ "${LINE}" != "" ]; then
+		sed -i "s/^${2}=.*/${2}=${3}/" "${1}"
+	else
+		echo "${2}=${3}" >> "${1}"
+	fi
+}
+
+showHelp() {
+	echo "buildrelease version"
+	local -r PKGBUILD=${BASEDIR}/_dist/arch/PKGBUILD
+	local CURVERSION="0"
+	CURVERSION=$(readSetting "${PKGBUILD}" "pkgver" "0")
+	echo ""
+	echo "Current version : ${CURVERSION}"
+}
+
+buildRelease() {
+	local -r PKGBUILD=${BASEDIR}/_dist/arch/PKGBUILD
+	writeSetting "${PKGBUILD}" "pkgver" "${VERSION}"
+	writeSetting "${PKGBUILD}" "pkgrel" "1"
+	local -r GITBRANCH=$(git rev-parse --abbrev-ref HEAD)
+	git commit -a -m "New release ${VERSION}"
+	git push
+	git checkout main
+	git pull
+	git merge "${GITBRANCH}"
+	git push
+	git tag -a "${VERSION}" -m "Version ${VERSION}"
+	git push --tags
+	git checkout "${GITBRANCH}"
+}
+
+BASEDIR="$(pwd "${BASH_SOURCE[0]}")"
+
+if [ "${1}" == "" ]; then
+	showHelp
+	exit 1
+fi
+
+VERSION="${1}"
+buildRelease
