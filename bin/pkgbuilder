@@ -434,7 +434,7 @@ TRGDIR=$(readSetting "${CNFFILE}" "TRGDIR" "/etc/pkgbuilder/targets")
 PLUGINDIR=$(readSetting "${CNFFILE}" "PLUGINDIR" "/usr/share/pkgbuilder/plugins")
 MODELDIR=$(readSetting "${CNFFILE}" "MODELDIR" "/usr/share/pkgbuilder/models")
 WORKDIR=$(readSetting "${CNFFILE}" "WORKDIR" "/var/cache/pkgbuilder")
-VARDIR=$(readSetting "${CNFFILE}" "VARDIR" "/var/lib/pkgbuilder")
+# VARDIR=$(readSetting "${CNFFILE}" "VARDIR" "/var/lib/pkgbuilder")
 
 case ${ARGCMD} in
 	list) pkgList;;
