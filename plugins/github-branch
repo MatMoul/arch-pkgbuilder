@@ -68,7 +68,6 @@ plugin_update() {
 	writeSetting "${PKGBUILD}" "pkgname" "${PKGNAME}"
 	writeSetting "${PKGBUILD}" "pkgrel" "1"
 	local -r PKGVERSION=$(readSetting "${PKGSETTINGS}" "pkgver" "0")
-	local -r PKGREVISION=$(readSetting "${PKGSETTINGS}" "pkgrev" "0")
 	local -r PKGNEWREVISION=$((PKGREVISION + 1))
 	writeSetting "${PKGBUILD}" "pkgver" "${PKGVERSION}.r${PKGNEWREVISION}.${ONLINECOMMIT:0:7}"
 }

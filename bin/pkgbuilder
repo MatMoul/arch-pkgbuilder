@@ -143,7 +143,7 @@ pkgBuild() { # $1=PKGNAME
 	# shellcheck disable=SC2034  # Variable for plugin
 	local -r PKGBUILD="${PKGDIR}/${PKGNAME}/files/PKGBUILD"
 	. "${PLUGINFILE}"
-	local -r PKGFILES="${PKGDIR}/${PKGNAME}/files"
+	local PKGFILES="${PKGDIR}/${PKGNAME}/files"
 	if ! PKGFILES=$(plugin_getpkgfiles "${PKGDIR}" "${PKGNAME}"); then
 		if [[ "${DRYRUN}" == "0" ]]; then
 			writeSetting "${PKGDIR}"/"${PKGNAME}"/settings "lastbuildstatus" "Error - No PKG files provided"
