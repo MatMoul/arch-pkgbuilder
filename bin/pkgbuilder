@@ -401,14 +401,15 @@ pkgPushToAUR() { # $1=PKGNAME
 	chown -R pkgbuilder "${TMPDIR}"
 	# shellcheck disable=SC2024
 	sudo -u pkgbuilder makepkg --printsrcinfo > .SRCINFO
+	chown -R root "${TMPDIR}"
 	git add -A
 	git commit -a -m "Version ${PKGVERSION}"
 
-	#if ! git push --config core.sshCommand="ssh -i ${AURSSHKEY}"; then
-	#	rm -rf "${TMPDIR}"
-	#	return 1
-	#fi
-	#rm -rf "${TMPDIR}"
+	if ! git push; then
+		rm -rf "${TMPDIR}"
+		return 1
+	fi
+	rm -rf "${TMPDIR}"
 }
 
 CNFFILE="/etc/pkgbuilder/config"
