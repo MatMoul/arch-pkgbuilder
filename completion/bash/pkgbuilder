@@ -5,7 +5,7 @@ _pkgbuilder() {
 	local cur prev words cword args
 	_init_completion || return
 	
-	local -r cmdargs="list info create build bump checkupdate update checkupdateall updateall"
+	local -r cmdargs="list info create build bump checkupdate update pushtoaur checkupdateall updateall"
 	local -r cnfargs="--help --cnf --notify --nopush --dry-run --dbg"
 	#local cnffile=/etc/pkgbuilder/config
 	local pkgdir="/etc/pkgbuilder/packages"
@@ -41,7 +41,7 @@ _pkgbuilder() {
 			COMPREPLY=($(compgen -W "${MDLLIST}" -- "${COMP_WORDS[COMP_CWORD]}"))
 			return
 		;;
-		info | build | bump | checkupdate | update)
+		info | build | bump | checkupdate | update | pushtoaur)
 			local -r PKGLIST=$(\ls ${pkgdir})
 			# shellcheck disable=SC2207
 			COMPREPLY=($(compgen -W "${PKGLIST}" -- "${COMP_WORDS[COMP_CWORD]}"))
