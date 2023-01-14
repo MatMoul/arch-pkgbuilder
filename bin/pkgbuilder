@@ -204,16 +204,8 @@ pkgBuild() { # $1=PKGNAME
 		writeSetting "${PKGDIR}"/"${PKGNAME}"/settings "lastbuildstatus" "Ok"
 	fi
 	local -r PKGTARGET=$(readSetting "${PKGDIR}"/"${PKGNAME}"/settings "target" "")
-	if [[ "${DRYRUN}" == "0" ]]; then
-		if [[ "${NOPUSH}" == "0" ]]; then
-			if [ ! -d "${VARDIR}"/packages/"${PKGTARGET}" ]; then
-				mkdir -p "${VARDIR}"/packages/"${PKGTARGET}"
-			fi
-			cp "${PKGFILENAME}" "${VARDIR}"/packages/"${PKGTARGET}"
-		fi
-	fi
 	pkgPush "${PKGNAME}" "${PKGFILENAME}"
-	rm -r "${WORKDIR}"/.output
+	rm "${WORKDIR}"/.output/"${PKGNAME}"*.pkg.tar.zst
 }
 pkgPush() { # $1=PKGNAME $2=PKGFILE
 	local -r PKGNAME=${1}
