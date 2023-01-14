@@ -68,7 +68,7 @@ updatePkgSums() { # $1=FILES
 	local -r FILES=${1}
 	local TMPDIR=""
 	TMPDIR=$(mktemp -d)
-	cp -r "${FILES}/*" "${TMPDIR}"
+	cp -r "${FILES}"/* "${TMPDIR}"
 	chown -R pkgbuilder "${TMPDIR}"
 	sudo -u pkgbuilder updpkgsums "${TMPDIR}"/PKGBUILD
 	cp -r "${TMPDIR}"/PKGBUILD "${FILES}/"

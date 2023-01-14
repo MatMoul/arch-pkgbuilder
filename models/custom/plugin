@@ -1,25 +1,26 @@
 #!/bin/bash
 
-custom_plugin_isupdatable() {
+plugin_isupdatable() {
 	return 1
 }
 
-custom_plugin_isbumpable() {
+plugin_isbumpable() {
+	return 0
+}
+
+plugin_getpkgfiles() {
+	echo "${PKGDIR}/${PKGNAME}/files"
+}
+
+plugin_bump() {
+	local -r PKGREL=$(readSetting "${PKGBUILD}" "pkgrel" 0)
+	sed -i "s/pkgrel=.*/pkgrel=$((PKGREL+1))/" "${PKGBUILD}"
+}
+
+plugin_getlatestversion() {
 	return 1
 }
 
-custom_plugin_getpkgfiles() {
-	return 1
-}
-
-custom_plugin_bump() {
-	return 1
-}
-
-custom_plugin_getlatestversion() {
-	return 1
-}
-
-custom_plugin_update() {
+plugin_update() {
 	return 1
 }

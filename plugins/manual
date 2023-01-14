@@ -9,7 +9,8 @@ plugin_isbumpable() {
 }
 
 plugin_getpkgfiles() {
-	updatePkgSums "${PKGDIR}"/"${PKGNAME}"/files
+	updatePkgSums "${PKGDIR}/${PKGNAME}/files"
+	echo "${PKGDIR}/${PKGNAME}/files"
 }
 
 plugin_bump() {
