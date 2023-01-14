@@ -105,6 +105,11 @@ pkgList() {
 		VALUES+=("$(tblCell "${PKGNAME}" 30)")
 		VALUE=$(tblCell "$(readSetting "${PKGDIRNAME}"/settings version)" 24)
 		VALUES+=("${VALUE}")
+		if [ "$(readSetting "${PKGDIRNAME}"/settings aursshkey '')" == "" ]; then
+			VALUES+=("  ")
+		else
+			VALUES+=(" *")
+		fi
 		VALUES+=("$(tblCell "$(readSetting "${PKGDIRNAME}"/settings plugin)" 20)")
 		VALUES+=("$(tblCell "$(readSetting "${PKGDIRNAME}"/settings target)" 20)")
 		VALUE=$(tblCell "$(readSetting "${PKGDIRNAME}"/settings lastbuilddate)" 20)
