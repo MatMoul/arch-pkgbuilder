@@ -5,7 +5,11 @@ plugin_isupdatable() {
 }
 
 plugin_isbumpable() {
-	return 0
+	return 1
+}
+
+plugin_ispushabletoaur() {
+	return 1
 }
 
 plugin_getpkgfiles() {

@@ -8,6 +8,10 @@ plugin_isbumpable() {
 	return 1
 }
 
+plugin_ispushabletoaur() {
+	return 1
+}
+
 plugin_getpkgfiles() {
 	if [ -d "${PKGDIR}"/"${PKGNAME}"/files ]; then
 		if ! rm -r "${PKGDIR}"/"${PKGNAME}"/files; then

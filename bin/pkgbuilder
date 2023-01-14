@@ -14,6 +14,7 @@ showHelp() {
 	echo "	checkupdateall        Check all packages update"
 	echo "	update pkgname        Update package"
 	echo "	updateall             Update all packages"
+	echo "	pushtoaur pkgname     Push package to AUR"
 	echo ""
 	echo "args :"
 	echo "	--cnf configfile"
@@ -142,7 +143,7 @@ pkgBuild() { # $1=PKGNAME
 	# shellcheck disable=SC2034  # Variable for plugin
 	local -r PKGBUILD="${PKGDIR}/${PKGNAME}/files/PKGBUILD"
 	. "${PLUGINFILE}"
-	local PKGFILES=""
+	local -r PKGFILES="${PKGDIR}/${PKGNAME}/files"
 	if ! PKGFILES=$(plugin_getpkgfiles "${PKGDIR}" "${PKGNAME}"); then
 		if [[ "${DRYRUN}" == "0" ]]; then
 			writeSetting "${PKGDIR}"/"${PKGNAME}"/settings "lastbuildstatus" "Error - No PKG files provided"
@@ -367,6 +368,48 @@ pkgUpdateAll() {
 		pkgUpdate "${PKGNAME}"
 	done
 }
+pkgPushToAUR() { # $1=PKGNAME
+	local -r PKGNAME=${1}
+
+	local PLUGINFILE=""
+	if ! PLUGINFILE=$(getPluginFile "${PKGDIR}" "${PKGNAME}" "${PLUGINDIR}"); then
+		return 1
+	fi
+	. "${PLUGINFILE}"
+	if ! plugin_ispushabletoaur; then
+		return 1
+	fi
+
+	local -r AURSSHKEY=$(readSetting "${PKGDIR}"/"${PKGNAME}"/settings "aursshkey" "")
+	if [ "${AURSSHKEY}" == "" ]; then
+		return 1
+	fi
+
+	local -r PKGVERSION=$(readSetting "${PKGDIR}"/"${PKGNAME}"/settings "version" "0")
+	local -r PKGFILES="${PKGDIR}/${PKGNAME}/files"
+
+	local TMPDIR=""
+	TMPDIR=$(mktemp -d)
+	cd "${TMPDIR}" || return 1
+	if ! git clone ssh://aur@aur.archlinux.org/"${PKGNAME}".git --config core.sshCommand="ssh -i ${AURSSHKEY}"; then
+		return 1
+	fi
+	cd "${PKGNAME}" || return 1
+	git rm -rf ".*"
+	git rm -rf "*"
+	cp -r "${PKGFILES}"/* .
+	chown -R pkgbuilder "${TMPDIR}"
+	# shellcheck disable=SC2024
+	sudo -u pkgbuilder makepkg --printsrcinfo > .SRCINFO
+	git add -A
+	git commit -a -m "Version ${PKGVERSION}"
+
+	#if ! git push --config core.sshCommand="ssh -i ${AURSSHKEY}"; then
+	#	rm -rf "${TMPDIR}"
+	#	return 1
+	#fi
+	#rm -rf "${TMPDIR}"
+}
 
 CNFFILE="/etc/pkgbuilder/config"
 ARGCMD=""
@@ -382,7 +425,7 @@ while [[ ${#} -gt 0 ]]; do
   case ${1} in
 		--help) showHelp; exit 0;;
 		list | checkupdateall | updateall) ARGCMD="${1}"; shift;;
-		infos | build | bump | checkupdate | update) ARGCMD="${1}"; ARGPKG="${2}"; shift; shift;;
+		infos | build | bump | checkupdate | update | pushtoaur) ARGCMD="${1}"; ARGPKG="${2}"; shift; shift;;
 		create) ARGCMD="${1}"; ARGMDL="${2}"; ARGPKG="${3}"; shift; shift;;
 		--cnf) CNFFILE="${2}"; shift; shift;;
 		--notify) NOTIFY=1; shift;;
@@ -410,5 +453,6 @@ case ${ARGCMD} in
 	checkupdateall) pkgCheckUpdateAll;;
 	update) pkgUpdate "${ARGPKG}";;
 	updateall) pkgUpdateall;;
+	pushtoaur) pkgPushToAUR "${ARGPKG}";;
 	*) showHelp; exit 1;;
 esac

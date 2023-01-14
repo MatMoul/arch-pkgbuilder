@@ -2,3 +2,4 @@ plugin=github-release
 target=local-test
 githubuser=
 githubrepo=
+#aursshkey=
