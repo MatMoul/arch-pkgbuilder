@@ -33,7 +33,7 @@ plugin_getlatestversion() {
 		echo "Error in Github API"
 		return 1
 	fi
-	local -r GITHUBVERSION=${GITHUBTAGNAME//[[:alpha:]]/}
+	local -r GITHUBVERSION=${GITHUBTAGNAME//[[:alpha:]-]/}
 	if [ "${GITHUBVERSION}" == "" ]; then
 		echo "Error in Github API"
 		return 1
@@ -58,7 +58,7 @@ plugin_update() {
 		echo "Error in Github API"
 		return 1
 	fi
-	local -r GITHUBVERSION=${GITHUBTAGNAME//[[:alpha:]]/}
+	local -r GITHUBVERSION=${GITHUBTAGNAME//[[:alpha:]-]/}
 	if [ "${GITHUBVERSION}" == "" ]; then
 		echo "Error in Github API"
 		return 1
