@@ -200,7 +200,8 @@ pkgBuild() { # $1=PKGNAME
 		return 1
 	fi
 	local PKGFILENAME=""
-	PKGFILENAME=$(ls "${WORKDIR}"/.output/"${PKGNAME}"*.pkg.tar.zst)
+	# shellcheck disable=SC2012
+	PKGFILENAME=$(ls "${WORKDIR}"/.output/"${PKGNAME}"*.pkg.tar.zst | head -n 1)
 	local VERSION=""
 	VERSION=$(pacman -Qp "${PKGFILENAME}" | awk -F ' ' '{print $2}')
 	if [[ "${DRYRUN}" == "0" ]]; then
