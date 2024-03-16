@@ -1,0 +1,84 @@
+#!/bin/bash
+
+plugin_isupdatable() {
+	return 0
+}
+
+plugin_isbumpable() {
+	return 0
+}
+
+plugin_ispushabletoaur() {
+	return 0
+}
+
+plugin_getpkgfiles() {
+	echo "${PKGDIR}/${PKGNAME}/files"
+}
+
+plugin_bump() { 
+	local -r PKGREL=$(readSetting "${PKGBUILD}" "pkgrel" 0)
+	sed -i "s/pkgrel=.*/pkgrel=$((PKGREL+1))/" "${PKGBUILD}"
+}
+
+plugin_getlatestversion() {
+	local -r GITEABASEURL=$(readSetting "${PKGSETTINGS}" "giteaurl" "")
+	local -r GITEAUSER=$(readSetting "${PKGSETTINGS}" "giteauser" "")
+	local -r GITEAREPO=$(readSetting "${PKGSETTINGS}" "gitearepo" "")
+	local GITEATAGNAME=""
+	if ! GITEATAGNAME=$(curl -sL "${GITEABASEURL}/repos/${GITEAUSER}/${GITEAREPO}/tags" | jq -r ".[0].name"); then
+		echo "Error in Gitea API"
+		return 1
+	fi
+	if [ "${GITEATAGNAME}" == "" ]; then
+		echo "Error in Gitea API"
+		return 1
+	fi
+	local -r GITEAVERSION=${GITEATAGNAME//[[:alpha:]-]/}
+	if [ "${GITEAVERSION}" == "" ]; then
+		echo "Error in Gitea API"
+		return 1
+	fi
+	local -r PKGVERSION=$(readSetting "${PKGBUILD}" "pkgver" "0")
+	if [[ "${PKGVERSION}" == "${GITEAVERSION}" ]]; then
+		readSetting "${PKGSETTINGS}" "version" "0"
+	else
+		echo "${GITEAVERSION}-1"
+	fi
+}
+
+plugin_update() {
+	local -r GITEABASEURL=$(readSetting "${PKGSETTINGS}" "giteaurl" "")
+	local -r GITEAUSER=$(readSetting "${PKGSETTINGS}" "giteauser" "")
+	local -r GITEAREPO=$(readSetting "${PKGSETTINGS}" "gitearepo" "")
+	local GITEATAGNAME=""
+	if ! GITEATAGNAME=$(curl -sL "${GITEABASEURL}/api/v1/repos/${GITEAUSER}/${GITEAREPO}/tags" | jq -r ".[0].name"); then
+		echo "Error in Gitea API"
+		return 1
+	fi
+	if [ "${GITEATAGNAME}" == "" ]; then
+		echo "Error in Gitea API"
+		return 1
+	fi
+	local -r GITEAVERSION=${GITEATAGNAME//[[:alpha:]-]/}
+	if [ "${GITEAVERSION}" == "" ]; then
+		echo "Error in Gitea API"
+		return 1
+	fi
+	local -r PKGVERSION=$(readSetting "${PKGBUILD}" "pkgver" "0")
+	if [[ "${PKGVERSION}" == "${GITEAVERSION}" ]]; then
+		return 0
+	fi
+	
+	writeSetting "${PKGSETTINGS}" "pkgrel" "1"
+
+	writeSetting "${PKGBUILD}" "_giteaurl" "${GITEABASEURL}"
+	writeSetting "${PKGBUILD}" "_giteauser" "${GITEAUSER}"
+	writeSetting "${PKGBUILD}" "_gitearepo" "${GITEAREPO}"
+	writeSetting "${PKGBUILD}" "_pkgtagname" "${GITEATAGNAME}"
+	writeSetting "${PKGBUILD}" "pkgname" "${PKGNAME}"
+	writeSetting "${PKGBUILD}" "pkgrel" "1"
+	writeSetting "${PKGBUILD}" "pkgver" "${GITEAVERSION}"
+	
+	updatePkgSums "${PKGDIR}"/"${PKGNAME}"/files
+}
