@@ -1,0 +1,12 @@
+plugin=gitea-branch
+target=local-test
+giteaurl=
+giteauser=
+gitearepo=
+gitbranch=
+gitcommit=
+pkgrev=0
+pkgver=0
+version=0
+pkgrel=1
+#aursshkey=
