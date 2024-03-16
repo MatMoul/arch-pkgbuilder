@@ -36,7 +36,7 @@ readSetting() { # $1=filename $2=name $3=defaultvalue
 writeSetting() { #$1=filename $2=valuename $3=value
 	local -r LINE=$(grep "^${2}=" "${1}")
 	if [ "${LINE}" != "" ]; then
-		sed -i "s/^${2}=.*/${2}=${3}/" "${1}"
+		sed -i "s/^${2}=.*/${2}=${3//\//\\\/}/" "${1}"
 	else
 		echo "${2}=${3}" >> "${1}"
 	fi
