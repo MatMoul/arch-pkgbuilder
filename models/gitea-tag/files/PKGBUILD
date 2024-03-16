@@ -18,13 +18,13 @@ url="${_giteaurl}/${_giteauser}/${_gitearepo}"
 #install="${pkgname}.install"
 #provides=()
 #backup=()
-source=("${_githubrepo}::${_giteaurl}/${_giteauser}/${_gitearepo}/archive/refs/tags/${_pkgtagname}.tar.gz")
+source=("${_gitearepo}::${_giteaurl}/${_giteauser}/${_gitearepo}/archive/${_pkgtagname}.tar.gz")
 sha256sums=('SKIP')
 
 build() {
-	cd "${_githubrepo}-${pkgver}"
+	cd "${_gitearepo}"
 }
 
 package() {
-	cd "${_githubrepo}-${pkgver}"
+	cd "${_gitearepo}"
 }
