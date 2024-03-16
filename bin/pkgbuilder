@@ -97,8 +97,10 @@ pkgList() {
 	if [ ! -d "${PKGDIR}" ]; then
 		return 1
 	fi
+	local PKGCOUNT=0
 	for PKGDIRNAME in "${PKGDIR}"/*; do
 		[[ -e "${PKGDIRNAME}" ]] || break
+		PKGCOUNT=$((PKGCOUNT + 1))
 		local PKGNAME=""
 		PKGNAME=$(basename "${PKGDIRNAME}")
 		local VALUES=()
@@ -117,6 +119,7 @@ pkgList() {
 		VALUES+=("$(readSetting "${PKGDIRNAME}"/settings lastbuildstatus)")
 		echo "${VALUES[@]}"
 	done
+	echo "${PKGCOUNT} packages"
 }
 pkgInfos() { # $1=PKGNAME
 	local -r PKGNAME=${1}
