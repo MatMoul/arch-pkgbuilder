@@ -17,8 +17,8 @@ url="https://github.com/${_githubuser}/${_githubrepo}"
 #install="${pkgname}.install"
 #provides=()
 #backup=()
-#source=("${_githubrepo}::https://github.com/${_githubuser}/${_githubrepo}/archive/refs/tags/${_pkgtagname}.tar.gz")
-#source=("${_githubrepo}::https://github.com/${_githubuser}/${_githubrepo}/releases/download/v${pkgver}/${_githubrepo}-${pkgver}.tar.gz")
+#source=("${_githubrepo}-${pkgrel}.tar.gz::https://github.com/${_githubuser}/${_githubrepo}/archive/refs/tags/${_pkgtagname}.tar.gz")
+#source=("${_githubrepo}-${pkgrel}.tar.gz::https://github.com/${_githubuser}/${_githubrepo}/releases/download/v${pkgver}/${_githubrepo}-${pkgver}.tar.gz")
 sha256sums=('SKIP')
 
 build() {

@@ -10,7 +10,7 @@ license=('GPL3')
 #depends=()
 #makedepends=()
 #optdepends=()
-#source=("${pkgname}::git+https://url.git")
+#source=("${pkgname}-${pkgrel}.tar.gz::git+https://url.git")
 #md5sums=('SKIP')
 #backup=()
 
