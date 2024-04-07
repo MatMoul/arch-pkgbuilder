@@ -16,9 +16,9 @@ if [ "${VERSION}" == "" ]; then
 	exit 1
 fi
 
-ssh -T git@github.com
+ssh -T gitea@ssh.git.netm.ch
 if [ ! "${?}" = "1" ]; then
-  echo "No Github ssh key loaded exiting..."
+  echo "No ssh key loaded exiting..."
   exit 1
 fi
 
