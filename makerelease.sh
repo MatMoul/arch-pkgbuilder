@@ -16,13 +16,6 @@ if [ "${VERSION}" == "" ]; then
 	exit 1
 fi
 
-ssh -T gitea@ssh.git.netm.ch
-if [ ! "${?}" = "1" ]; then
-  echo "No ssh key loaded exiting..."
-  exit 1
-fi
-
-
 CURRENTBRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 if [ ! "${CURRENTBRANCH}" == "dev" ]; then
